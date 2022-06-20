@@ -2,6 +2,63 @@
 #include <windows.h>
 #include <stdio.h>
 
+ template<typename type=int>
+class stack
+{
+    struct node
+    {
+        type value;
+        node*prev;
+    };
+protected:
+    node*self;
+    size_t count=0;
+public:
+    stack(const stack&s):self(s.self),count(s.count){}
+    stack(){}
+
+    ~stack()
+    {while(self)pop();}
+
+    stack&push(const type i)
+    {
+        self=new node{i,self};
+        count++;
+        return*this;
+    }
+
+    const type pop()
+    {
+        if(!count)return 0;
+        node*p=self->prev;
+        const type v=self->value;
+        delete self;
+        self=p;
+        count--;
+        return v;
+    }
+
+    inline stack&operator+(const type i)
+    {return push(i);}
+
+    inline const type operator+()
+    {return pop();}
+
+    operator type*()
+    {
+        if(!count)return 0;
+        type*p=new type[count];
+        while(count)p[count]=pop();
+        return p;
+    }
+
+    inline const size_t size()const
+    {return count;}
+
+    inline operator size_t()const
+    {return count;}
+};
+
 enum config:char//from arduino
 {
     SERIAL_5N1,
@@ -30,20 +87,34 @@ enum config:char//from arduino
     SERIAL_8O2
 };
 
-void*com_init(const config t=SERIAL_8N1)//default like arduino
+const char*com_find()
 {
 #ifdef WIN32
+    stack<char>all;
     char path[7]={0};//how many bytes need for 'COM255'?
     void*com=(void*)0xffffffff;//0xffffffff it is nullptr?
 
-    for(unsigned char i=1; ;i++)//1-255
+    for(unsigned char i=1;i++;)//1-255
     {
         sprintf(path,"COM%d",i);
         com=CreateFileA(path,GENERIC_READ|GENERIC_WRITE,0,0,OPEN_EXISTING,0,0);//A for using 1 byte char
-        if(size_t(com)!=0xffffffff){printf("connected on:%s\n",path);break;}//there is not available port
+        if(size_t(com)!=0xffffffff)all.push(i);//add it cuz it is available
         CloseHandle(com);
-        if(!i){printf("error:no available ports!\n");exit(1);}
     }
+
+    all.push(0);//push 0 at end cuz it will turn in cstr
+    return all;//aware for memory leak! (keep in mind that need for remove in future)
+#else
+    //for linux
+#endif
+}
+
+void*com_init(const char id,const config t=SERIAL_8N1)//default like arduino
+{
+#ifdef WIN32
+    char path[7]={0};//how many bytes need for 'COM255'?
+    sprintf(path,"COM%d",id);
+    void*com=CreateFileA(path,GENERIC_READ|GENERIC_WRITE,0,0,OPEN_EXISTING,0,0);
 
     DCB info;
     GetCommState(com,&info);
@@ -58,9 +129,10 @@ void*com_init(const config t=SERIAL_8N1)//default like arduino
         break;
         default:printf("error:not supported this config of com!\n");exit(2);
     }
+
     return com;
 #else
-
+    //for linux
 #endif
 }
 
@@ -73,7 +145,7 @@ const size_t com_write(void*com,const char*message,size_t count=0)
      WriteFile(com,message,count,&how,0);
      return how;
 #else
-
+     //for linux
 #endif
 }
 
@@ -83,13 +155,13 @@ bool com_close(void*com)
 #ifdef WIN32
      return CloseHandle(com);
 #else
-
+     //for linux
 #endif
 }
 
 int main()
-{
-    void*com=com_init();
+{ 
+    void*com=com_init(*com_find());
     com_write(com,"test");
     com_close(com);
 
