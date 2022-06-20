@@ -87,7 +87,10 @@ enum config:char//from arduino
     SERIAL_8O2
 };
 
-const char*com_find()
+namespace com
+{
+
+const char*find()
 {
 #ifdef WIN32
     stack<char>all;
@@ -109,7 +112,7 @@ const char*com_find()
 #endif
 }
 
-void*com_init(const char id,const config t=SERIAL_8N1)//default like arduino
+void*init(const char id,const config t=SERIAL_8N1)//default like arduino
 {
 #ifdef WIN32
     char path[7]={0};//how many bytes need for 'COM255'?
@@ -137,7 +140,7 @@ void*com_init(const char id,const config t=SERIAL_8N1)//default like arduino
 }
 
  inline
-const size_t com_write(void*com,const char*message,size_t count=0)
+const size_t write(void*com,const char*message,size_t count=0)
 {
 #ifdef WIN32
      if(!count){for(const char*i=message;*i++;count++);}//if count=0 then send before '\0' was reached
@@ -150,7 +153,7 @@ const size_t com_write(void*com,const char*message,size_t count=0)
 }
 
  inline
-bool com_close(void*com)
+bool finish(void*com)
 {
 #ifdef WIN32
      return CloseHandle(com);
@@ -159,11 +162,15 @@ bool com_close(void*com)
 #endif
 }
 
-int main()
-{ 
-    void*com=com_init(*com_find());
-    com_write(com,"test");
-    com_close(com);
+};
 
-    return 0;
+int main()
+{
+    const char*all=com::find();
+    if(!all)return 2;
+    printf("connected on: COM%d\n",*all);
+    void*com=com::init(*all);
+    printf("%d bytes was sended\n",com::write(com,"test"));
+
+    return!com::finish(com);
 }
